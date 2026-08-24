@@ -1,0 +1,6 @@
+# Publicar únicamente el reporte
+*
+!index.html
+!.gitignore
+!README.md
+!vercel.json
