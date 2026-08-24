@@ -88,6 +88,7 @@
   }
 
   .topbar-logos {
+    max-width: 1140px; margin: 0 auto;
     display: flex; align-items: center; justify-content: space-between;
     gap: 16px; padding: 14px 24px;
   }
@@ -96,6 +97,7 @@
   .topbar-logos .logo-anahuac { height: 32px; }
 
   .topbar-meta {
+    max-width: 1140px; margin: 0 auto;
     display: flex; align-items: center; justify-content: space-between;
     flex-wrap: wrap; gap: 10px;
     padding: 9px 24px;
@@ -117,6 +119,10 @@
   @media (max-width: 520px) {
     .topbar-logos .logo-dpae { height: 68px; }
     .topbar-logos .logo-anahuac { height: 26px; }
+  }
+
+  @media (max-width: 640px) {
+    .topbar-logos, .topbar-meta { padding-left: 20px; padding-right: 20px; }
   }
 
   /* ---------- shell ---------- */
