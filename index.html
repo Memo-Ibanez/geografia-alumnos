@@ -540,6 +540,26 @@
   #tooltip.visible { opacity: 1; }
   #tooltip b { font-weight: 700; }
 
+  /* ---------- botón descargar PDF + impresión ---------- */
+
+  .topbar-actions { display: flex; align-items: center; gap: 12px; }
+  .topbar-btn {
+    background: var(--naranja); color: #fff; border: 0; border-radius: 999px;
+    padding: 6px 14px; font: inherit; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer;
+  }
+  .topbar-btn:hover { background: var(--naranja-deep); }
+
+  @page { margin: 12mm; }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #fff; }
+    #downloadPdfBtn, .toolbar, #resetBtn, .reset-link, .map-zoom-controls, #tooltip { display: none !important; }
+    .bars-list, .region-list { max-height: none !important; overflow: visible !important; }
+    .table-wrap { overflow: visible !important; }
+    .bar-row, tr, .cdmx-map-figure, .map-grid { break-inside: avoid; }
+  }
+
   /* ---------- footer ---------- */
 
   .foot {
@@ -577,7 +597,7 @@
   </div>
   <div class="topbar-meta">
     <div class="crumb"><strong>Geografía de Alumnos</strong><span>·</span>Panel interno</div>
-    <span class="pill" id="sourcePill">Datos simulados</span>
+    <div class="topbar-actions"><button id="downloadPdfBtn" class="topbar-btn" type="button">Descargar PDF</button><span class="pill" id="sourcePill">Datos simulados</span></div>
   </div>
 </div>
 
@@ -1893,6 +1913,8 @@
     var status = document.getElementById("uploadStatus");
     var resetBtn = document.getElementById("resetBtn");
     var sourcePill = document.getElementById("sourcePill");
+    var pdfBtn = document.getElementById("downloadPdfBtn");
+    if (pdfBtn) pdfBtn.addEventListener("click", function () { window.print(); });
 
     var EXCEL_EXT = ["xlsx", "xls", "xlsm", "xlsb"];
 
