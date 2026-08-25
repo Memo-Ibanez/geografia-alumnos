@@ -140,6 +140,7 @@
   .hero {
     padding: 52px 0 8px;
     position: relative;
+    text-align: center;
     background:
       radial-gradient(900px 480px at 88% -15%, rgba(255,89,0,0.10), transparent 60%),
       linear-gradient(180deg, var(--page) 0%, var(--surface-2) 130%);
@@ -165,27 +166,30 @@
 
   h1.hero-title {
     font-weight: 600;
-    font-size: clamp(30px, 4.6vw, 50px);
+    font-size: clamp(28px, 4vw, 46px);
     letter-spacing: -0.01em;
-    margin: 0 0 16px;
-    max-width: 22ch;
+    margin: 0 auto 16px;
+    max-width: 28ch;
     text-wrap: balance;
   }
 
-  h1.hero-title em { font-style: normal; color: var(--naranja); }
+  h1.hero-title em { font-style: normal; color: var(--naranja); white-space: nowrap; }
+
+  @media (max-width: 560px) { h1.hero-title em { white-space: normal; } }
 
   .lede {
     font-size: 17px;
     color: var(--text-secondary);
-    max-width: 58ch;
+    max-width: 60ch;
     line-height: 1.6;
-    margin: 0 0 8px;
+    margin: 0 auto 8px;
   }
 
   /* ---------- toolbar ---------- */
 
   .toolbar {
     margin-top: 26px;
+    text-align: left;
     padding: 16px 18px;
     background: var(--surface-2);
     border: 1px solid var(--border);
