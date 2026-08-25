@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <style>
   :root {
@@ -692,11 +693,11 @@
     <div class="toolbar">
       <label class="btn-primary">
         Subir base de datos (CSV)
-        <input type="file" id="fileInput" accept=".csv,.txt" />
+        <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls,.xlsm,.xlsb" />
       </label>
       <div class="toolbar-text">
         <p id="uploadStatus">Mostrando datos simulados · 2,000 registros.</p>
-        <p class="privacy-note">Formato CSV. Si tu archivo está en Excel: Archivo → Guardar como → CSV. Tus datos se procesan en tu navegador y no se suben a ningún servidor; el mapa de la Ciudad de México sí necesita internet, porque carga mosaicos de OpenStreetMap.</p>
+        <p class="privacy-note">Acepta CSV o Excel (.xlsx, .xls) — se usa la primera hoja del libro. Tus datos se procesan en tu navegador y no se suben a ningún servidor; el mapa sí necesita internet, porque carga mosaicos de OpenStreetMap.</p>
       </div>
       <button class="text-link reset-link" id="resetBtn" type="button">Volver a datos simulados</button>
     </div>
@@ -2018,19 +2019,29 @@
       });
     }
 
+    function excelToCsv(file) {
+      return file.arrayBuffer().then(function (buf) {
+        if (typeof XLSX === "undefined") throw new Error("La libreria de Excel no cargo (revisa tu conexion).");
+        var wb = XLSX.read(new Uint8Array(buf), { type: "array" });
+        var sheet = wb.Sheets[wb.SheetNames[0]];
+        return { text: XLSX.utils.sheet_to_csv(sheet), encoding: "Excel" };
+      });
+    }
+
     fileInput.addEventListener("change", function (e) {
       var file = e.target.files[0];
       if (!file) return;
       var ext = (file.name.split(".").pop() || "").toLowerCase();
-      if (EXCEL_EXT.indexOf(ext) !== -1) {
+      var isExcel = EXCEL_EXT.indexOf(ext) !== -1;
+      if (false) {
         status.textContent = "Ese archivo es de Excel (." + ext + "); esta herramienta solo lee CSV de texto, así que lo que veías antes eran coincidencias falsas, no tus datos reales. En Excel: Archivo → Guardar como → \"CSV (delimitado por comas)\", y sube ese archivo.";
         fileInput.value = "";
         return;
       }
       status.textContent = "Procesando " + file.name + "…";
-      decodeFileText(file).then(function (decoded) {
+      (isExcel ? excelToCsv(file) : decodeFileText(file)).then(function (decoded) {
         var text = decoded.text;
-        if (looksBinary(text)) {
+        if (!isExcel && looksBinary(text)) {
           status.textContent = file.name + " no se pudo leer como texto (parece un formato binario, como Excel). Guárdalo como CSV desde Excel (Archivo → Guardar como → CSV) y vuelve a subirlo.";
           fileInput.value = "";
           return;
@@ -2053,11 +2064,14 @@
           (extracted.invalid ? " · " + fmtInt(extracted.invalid) + " filas sin CP reconocible" : "") +
           (muniCol >= 0 ? " · columna de municipio detectada" : "") +
           (coloniaCol >= 0 ? " · columna de colonia detectada" : "") +
-          (decoded.encoding === "Windows-1252" ? " · texto leído como Windows-1252 (detectado automáticamente)" : "") + ".";
+          (decoded.encoding === "Windows-1252" ? " · texto leído como Windows-1252 (detectado automáticamente)" : "") +
+          (decoded.encoding === "Excel" ? " · leído desde Excel (primera hoja)" : "") + ".";
         sourcePill.textContent = file.name;
         resetBtn.style.display = "inline-flex";
-      }).catch(function () {
-        status.textContent = "No se pudo leer " + file.name + ". Verifica que sea un CSV de texto.";
+      }).catch(function (err) {
+        status.textContent = "No se pudo leer " + file.name + ". " +
+          (isExcel ? "Verifica que la primera hoja del Excel tenga los datos con encabezados." : "Verifica que sea un CSV de texto.") +
+          (err && err.message ? " (" + err.message + ")" : "");
       });
     });
 
