@@ -2993,8 +2993,8 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
           lyr.on("mouseout", function () { cpLayer.resetStyle(lyr); });
         }
       }).addTo(map);
-      try { map.fitBounds(cpLayer.getBounds(), { padding: [8, 8] }); } catch (e) {}
-      setTimeout(function () { map.invalidateSize(); }, 60);
+      // fitBounds se hace tras invalidateSize (abajo) para que el contenedor ya tenga tamaño.
+      setTimeout(function () { map.invalidateSize(); try { map.fitBounds(cpLayer.getBounds(), { padding: [8, 8] }); } catch (e) {} }, 90);
       return;
     }
 
