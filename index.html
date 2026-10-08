@@ -3783,16 +3783,61 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
   // "LC-MERC-16" y "LC-MERC-20" cuenten juntos. Si un área no tiene nombre en la lista, se
   // muestra su código (edita PROGRAMA_AREAS para completar los nombres legibles).
   var PROGRAMA_AREAS = {
-    ADMI: "Administración y Dirección de Empresas",
-    MERC: "Mercadotecnia",
-    NEGI: "Negocios Internacionales",
-    ECON: "Economía"
+    // Nombres homologados desde BASE MADRE SEAES (columna Program -> Nombre). Clave = código
+    // sin año de plan (p. ej. "LC-MERC"); así todos los planes de un programa cuentan juntos.
+    "LC-ACTU": "Actuaría",
+    "LC-ADMI": "Dirección y Admon. de Emp.",
+    "LC-ADNE": "Administración de Negocios",
+    "LC-ADPG": "Admon. Pública y Gobierno",
+    "LC-ADTU": "Administración Turística",
+    "LC-ARQU": "Arquitectura",
+    "LC-ARVI": "Artes Visuales",
+    "LC-BIOT": "Biotecnología",
+    "LC-CIRE": "Ciencias Religiosas",
+    "LC-COMU": "Comunicación",
+    "LC-DDEP": "Dirección del Deporte",
+    "LC-DEEN": "Dir. Empresas de Entretenimiento",
+    "LC-DERL": "Derecho",
+    "LC-DFIN": "Dir. Financiera",
+    "LC-DIGR": "Diseño Gráfico",
+    "LC-DIHO": "Dirección Int. de Hoteles",
+    "LC-DIMI": "Diseño de Moda e Innovación",
+    "LC-DIMU": "Diseño Multimedia",
+    "LC-DIND": "Diseño Industrial",
+    "LC-DIRE": "Dirección de Restaurantes",
+    "LC-ECON": "Economía",
+    "LC-ENMA": "Engineering Management",
+    "LC-FICO": "Finanzas y Contaduría P.",
+    "LC-GLMA": "Global Management",
+    "LC-GSTR": "Gastronomía",
+    "LC-HIST": "Historia",
+    "LC-INAM": "Ing. Ambiental",
+    "LC-INBM": "Ing. Biomédica",
+    "LC-INCI": "Ing. Civil",
+    "LC-INIE": "Ing. Industrial para la Dir.",
+    "LC-INMT": "Ing. Mecatrónica",
+    "LC-INQU": "Ing. Química",
+    "LC-INSG": "Inteligencia Estratégica",
+    "LC-INST": "Ing. en Sistemas y Tec. de Inf.",
+    "LC-LMGC": "Lenguas y Gestión Cultural",
+    "LC-MEDI": "Médico Cirujano",
+    "LC-MERC": "Mercadotecnia Estratégica",
+    "LC-MUSI": "Música Contemporánea",
+    "LC-NEGI": "Negocios Internacionales",
+    "LC-NUTR": "Nutrición",
+    "LC-ODNT": "Médico Cirujano Dentista",
+    "LC-PEDG": "Pedagogía",
+    "LC-PSIC": "Psicología",
+    "LC-RELI": "Relaciones Internacionales",
+    "LC-RSDS": "Dir. en Resp. Social y Sustentabilidad",
+    "LC-TEAC": "Teatro y Actuación",
+    "LC-TEFR": "Terapia Física y Rehabilitación"
   };
   function areaKeyPrograma(code) {
     var up = String(code == null ? "" : code).toUpperCase().trim();
     up = up.replace(/-?\d+\s*$/, "");      // quita el año del plan (p. ej. "-20")
     var parts = up.split("-");
-    return parts.length >= 2 ? parts[1] : parts[0];
+    return up; // código sin año, p. ej. "LC-MERC" (coincide con la columna Program del catálogo SEAES)
   }
   function areaPrograma(code) {
     if (!code) return "";
