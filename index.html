@@ -1364,6 +1364,20 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
       <button class="text-link reset-link" id="resetBtn" type="button">Volver a datos simulados</button>
     </div>
 
+    <div class="filter-bar" id="filterBar" hidden style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;margin-top:16px;padding:12px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;">
+      <span style="align-self:center;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--naranja);">Filtrar por</span>
+      <label class="filter-field" style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--text-secondary);">
+        <span>Facultad</span>
+        <select id="filterFacultad" style="min-width:210px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1);color:var(--text-primary);font:inherit;font-size:13px;"><option value="">Todas las facultades</option></select>
+      </label>
+      <label class="filter-field" style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--text-secondary);">
+        <span>Carrera</span>
+        <select id="filterCarrera" style="min-width:250px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1);color:var(--text-primary);font:inherit;font-size:13px;"><option value="">Todas las carreras</option></select>
+      </label>
+      <button type="button" id="filterClear" class="text-link">Limpiar</button>
+      <span id="filterCount" style="margin-left:auto;align-self:center;font-size:12px;color:var(--text-secondary);"></span>
+    </div>
+
     <div class="stats">
       <div class="stat">
         <p class="num tnum" id="kpiTotal">—</p>
@@ -2311,6 +2325,20 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
   // CIUDAD y el reporte terminaba tratando localidades ("Ciudad Satélite") como si fueran
   // municipios. Ahora "municipio", "alcaldía" y "delegación" tienen prioridad sobre "ciudad",
   // y la heurística anterior queda solo como último recurso.
+  function detectFacultadColumn(rows, exclude) {
+    return findColumnByName(rows, [
+      /^facultad$/, /^escuela$/, /^facultad escuela$/, /^division$/, /^area academica$/,
+      /facultad/, /escuela/
+    ], /prepa|bachill|preparatoria|colegio|procedencia|secundaria/, exclude);
+  }
+
+  function detectCarreraColumn(rows, exclude) {
+    return findColumnByName(rows, [
+      /^carrera$/, /^programa$/, /^programa educativo$/, /^licenciatura$/, /^plan de estudios$/,
+      /^pe$/, /carrera/, /programa educativo/, /licenciatura/, /^programa/
+    ], /prepa|bachill|preparatoria|colegio|procedencia/, exclude);
+  }
+
   function detectMunicipioColumnByName(rows) {
     return findColumnByName(rows, [
       /^municipio$/, /^alcaldia$/, /^delegacion$/, /^municipio alcaldia$/,
@@ -2391,7 +2419,9 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
           becaPct: becaPct(claveRaw),
           becaCat: becaCategoria(claveRaw, descRaw),
           becaDesc: descRaw || null,
-          creditos: cred
+          creditos: cred,
+          facultad: cell(row, cols.facultad) || null,
+          carrera: cell(row, cols.carrera) || null
         });
       } else {
         invalid++;
@@ -3728,6 +3758,74 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
 
   // ---------- wiring ----------
 
+  // ---------- filtro por facultad / carrera ----------
+  var BASE_RECORDS = null; // registros reales completos, para filtrar sin re-leer el archivo
+
+  function filtroUnicos(arr) {
+    var seen = {}, out = [];
+    arr.forEach(function (v) { if (v && !seen[v]) { seen[v] = 1; out.push(v); } });
+    out.sort(function (a, b) { return String(a).localeCompare(String(b), "es"); });
+    return out;
+  }
+
+  function fillCarreras(fac) {
+    var selC = document.getElementById("filterCarrera");
+    if (!selC || !BASE_RECORDS) return;
+    var vals = BASE_RECORDS.filter(function (r) { return r.carrera && (!fac || r.facultad === fac); })
+      .map(function (r) { return r.carrera; });
+    selC.innerHTML = '<option value="">Todas las carreras</option>';
+    filtroUnicos(vals).forEach(function (c) {
+      var o = document.createElement("option"); o.value = c; o.textContent = c; selC.appendChild(o);
+    });
+  }
+
+  function setupFilters(records) {
+    var bar = document.getElementById("filterBar");
+    var selF = document.getElementById("filterFacultad");
+    var selC = document.getElementById("filterCarrera");
+    if (!bar || !selF || !selC) return;
+    var hasFac = records.some(function (r) { return r.facultad; });
+    var hasCar = records.some(function (r) { return r.carrera; });
+    if (!hasFac && !hasCar) { bar.hidden = true; return; }
+    bar.hidden = false;
+    selF.innerHTML = '<option value="">Todas las facultades</option>';
+    filtroUnicos(records.map(function (r) { return r.facultad; })).forEach(function (f) {
+      var o = document.createElement("option"); o.value = f; o.textContent = f; selF.appendChild(o);
+    });
+    var fF = selF.closest(".filter-field"); if (fF) fF.style.display = hasFac ? "" : "none";
+    var fC = selC.closest(".filter-field"); if (fC) fC.style.display = hasCar ? "" : "none";
+    selF.value = ""; selC.value = "";
+    fillCarreras("");
+    updateFilterCount();
+  }
+
+  function filteredRecords() {
+    if (!BASE_RECORDS) return null;
+    var f = document.getElementById("filterFacultad").value;
+    var c = document.getElementById("filterCarrera").value;
+    if (!f && !c) return BASE_RECORDS;
+    return BASE_RECORDS.filter(function (r) {
+      if (f && r.facultad !== f) return false;
+      if (c && r.carrera !== c) return false;
+      return true;
+    });
+  }
+
+  function updateFilterCount() {
+    var el = document.getElementById("filterCount");
+    if (!el || !BASE_RECORDS) return;
+    var recs = filteredRecords(), n = recs.length, t = BASE_RECORDS.length;
+    el.textContent = (n === t) ? (fmtInt(t) + " alumnos") : (fmtInt(n) + " de " + fmtInt(t) + " alumnos");
+  }
+
+  function applyFilters() {
+    var recs = filteredRecords();
+    if (!recs) return;
+    updateFilterCount();
+    if (recs.length === 0) return;
+    renderDashboard(recs, true);
+  }
+
   var SIMULATED = generateSimulated(2000, 42);
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -3737,6 +3835,14 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
     var status = document.getElementById("uploadStatus");
     var resetBtn = document.getElementById("resetBtn");
     var sourcePill = document.getElementById("sourcePill");
+    (function () {
+      var selF = document.getElementById("filterFacultad");
+      var selC = document.getElementById("filterCarrera");
+      if (selF) selF.addEventListener("change", function () { fillCarreras(selF.value); selC.value = ""; applyFilters(); });
+      if (selC) selC.addEventListener("change", function () { applyFilters(); });
+      var fc = document.getElementById("filterClear");
+      if (fc) fc.addEventListener("click", function () { selF.value = ""; selC.value = ""; fillCarreras(""); applyFilters(); });
+    })();
     var pdfBtn = document.getElementById("downloadPdfBtn");
     if (pdfBtn) pdfBtn.addEventListener("click", function () { window.print(); });
 
@@ -3829,14 +3935,18 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
           becaDesc: detectBecaDescColumn(parsed.rows, used),
           creditos: detectCreditosColumn(parsed.rows, used),
           estado: detectEstadoColumn(parsed.rows, used),
-          ciudad: detectCiudadColumn(parsed.rows, used)
+          ciudad: detectCiudadColumn(parsed.rows, used),
+          facultad: detectFacultadColumn(parsed.rows, used),
+          carrera: detectCarreraColumn(parsed.rows, used)
         };
         var extracted = extractRecords(dataRows, cols);
         if (extracted.list.length === 0) {
           status.textContent = "No se encontraron códigos postales válidos en " + file.name + ".";
           return;
         }
+        BASE_RECORDS = extracted.list;
         renderDashboard(extracted.list, true);
+        setupFilters(extracted.list);
         status.textContent = "Mostrando " + file.name + " · " + fmtInt(extracted.list.length) + " registros válidos" +
           (extracted.invalid ? " · " + fmtInt(extracted.invalid) + " filas sin CP reconocible" : "") +
           " · CP detectado " + cpSource +
@@ -3844,6 +3954,8 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
           (coloniaCol >= 0 ? " · columna de colonia detectada" : "") +
           (cols.becaClave >= 0 ? " · columna de beca detectada" : " · sin columna de beca") +
           (cols.creditos >= 0 ? " · columna de créditos detectada" : " · sin columna de créditos") +
+          (cols.facultad >= 0 ? " · columna de facultad detectada" : "") +
+          (cols.carrera >= 0 ? " · columna de carrera detectada" : "") +
           (decoded.encoding === "Windows-1252" ? " · texto leído como Windows-1252 (detectado automáticamente)" : "") +
           (decoded.encoding === "Excel" ? " · leído desde Excel (primera hoja)" : "") + ".";
         sourcePill.textContent = file.name;
@@ -3858,6 +3970,8 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
     resetBtn.addEventListener("click", function () {
       renderDashboard(SIMULATED);
       status.textContent = "Mostrando datos simulados · 2,000 registros.";
+      BASE_RECORDS = null;
+      var __fb = document.getElementById("filterBar"); if (__fb) __fb.hidden = true;
       sourcePill.textContent = "Datos simulados";
       resetBtn.style.display = "none";
       fileInput.value = "";
