@@ -3778,6 +3778,28 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
     out.sort(function (a, b) { return String(a).localeCompare(String(b), "es"); });
     return out;
   }
+  // Agrupación de programas por ÁREA (ignora el plan de estudios). Los códigos vienen como
+  // "LC-MERC-20": LC = licenciatura, MERC = área, 20 = plan. Se agrupa por el área para que
+  // "LC-MERC-16" y "LC-MERC-20" cuenten juntos. Si un área no tiene nombre en la lista, se
+  // muestra su código (edita PROGRAMA_AREAS para completar los nombres legibles).
+  var PROGRAMA_AREAS = {
+    ADMI: "Administración y Dirección de Empresas",
+    MERC: "Mercadotecnia",
+    NEGI: "Negocios Internacionales",
+    ECON: "Economía"
+  };
+  function areaKeyPrograma(code) {
+    var up = String(code == null ? "" : code).toUpperCase().trim();
+    up = up.replace(/-?\d+\s*$/, "");      // quita el año del plan (p. ej. "-20")
+    var parts = up.split("-");
+    return parts.length >= 2 ? parts[1] : parts[0];
+  }
+  function areaPrograma(code) {
+    if (!code) return "";
+    var k = areaKeyPrograma(code);
+    return PROGRAMA_AREAS[k] || k;
+  }
+
   function valOf(id) { var e = document.getElementById(id); return e ? e.value : ""; }
   function show(id, on) { var e = document.getElementById(id); if (e) { var fld = e.closest(".filter-field"); if (fld) fld.style.display = on ? "" : "none"; } }
 
@@ -3801,7 +3823,7 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
     fillSelect("filterFacultad", filtroUnicos(facBase.map(function (r) { return r.facultad; })), "Todas las facultades");
     var fac = valOf("filterFacultad");
     var carBase = facBase.filter(function (r) { return !fac || r.facultad === fac; });
-    fillSelect("filterCarrera", filtroUnicos(carBase.map(function (r) { return r.carrera; })), "Todos los programas");
+    fillSelect("filterCarrera", filtroUnicos(carBase.map(function (r) { return areaPrograma(r.carrera); })), "Todos los programas");
   }
 
   function setupFilters(records) {
@@ -3825,7 +3847,7 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
     return BASE_RECORDS.filter(function (r) {
       if (cam && r.campus !== cam) return false;
       if (fac && r.facultad !== fac) return false;
-      if (car && r.carrera !== car) return false;
+      if (car && areaPrograma(r.carrera) !== car) return false;
       return true;
     });
   }
