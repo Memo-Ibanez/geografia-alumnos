@@ -1367,12 +1367,16 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
     <div class="filter-bar" id="filterBar" hidden style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;margin-top:16px;padding:12px 16px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;">
       <span style="align-self:center;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--naranja);">Filtrar por</span>
       <label class="filter-field" style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--text-secondary);">
-        <span>Facultad</span>
-        <select id="filterFacultad" style="min-width:210px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1);color:var(--text-primary);font:inherit;font-size:13px;"><option value="">Todas las facultades</option></select>
+        <span>Campus</span>
+        <select id="filterCampus" style="min-width:200px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1);color:var(--text-primary);font:inherit;font-size:13px;"><option value="">Todos los campus</option></select>
       </label>
       <label class="filter-field" style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--text-secondary);">
-        <span>Carrera</span>
-        <select id="filterCarrera" style="min-width:250px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1);color:var(--text-primary);font:inherit;font-size:13px;"><option value="">Todas las carreras</option></select>
+        <span>Facultad</span>
+        <select id="filterFacultad" style="min-width:200px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1);color:var(--text-primary);font:inherit;font-size:13px;"><option value="">Todas las facultades</option></select>
+      </label>
+      <label class="filter-field" style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--text-secondary);">
+        <span>Programa</span>
+        <select id="filterCarrera" style="min-width:200px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1);color:var(--text-primary);font:inherit;font-size:13px;"><option value="">Todos los programas</option></select>
       </label>
       <button type="button" id="filterClear" class="text-link">Limpiar</button>
       <span id="filterCount" style="margin-left:auto;align-self:center;font-size:12px;color:var(--text-secondary);"></span>
@@ -2335,8 +2339,14 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
   function detectCarreraColumn(rows, exclude) {
     return findColumnByName(rows, [
       /^carrera$/, /^programa$/, /^programa educativo$/, /^licenciatura$/, /^plan de estudios$/,
-      /^pe$/, /carrera/, /programa educativo/, /licenciatura/, /^programa/
+      /^pe$/, /nom programa/, /carrera/, /programa educativo/, /licenciatura/, /programa/
     ], /prepa|bachill|preparatoria|colegio|procedencia/, exclude);
+  }
+
+  function detectCampusColumn(rows, exclude) {
+    return findColumnByName(rows, [
+      /^campus$/, /^sede$/, /^plantel$/, /campus/, /sede/, /plantel/
+    ], /prepa|bachill|preparatoria|colegio/, exclude);
   }
 
   function detectMunicipioColumnByName(rows) {
@@ -2421,7 +2431,8 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
           becaDesc: descRaw || null,
           creditos: cred,
           facultad: cell(row, cols.facultad) || null,
-          carrera: cell(row, cols.carrera) || null
+          carrera: cell(row, cols.carrera) || null,
+          campus: cell(row, cols.campus) || null
         });
       } else {
         invalid++;
@@ -3758,7 +3769,7 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
 
   // ---------- wiring ----------
 
-  // ---------- filtro por facultad / carrera ----------
+  // ---------- filtro por campus / facultad / programa ----------
   var BASE_RECORDS = null; // registros reales completos, para filtrar sin re-leer el archivo
 
   function filtroUnicos(arr) {
@@ -3767,46 +3778,54 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
     out.sort(function (a, b) { return String(a).localeCompare(String(b), "es"); });
     return out;
   }
+  function valOf(id) { var e = document.getElementById(id); return e ? e.value : ""; }
+  function show(id, on) { var e = document.getElementById(id); if (e) { var fld = e.closest(".filter-field"); if (fld) fld.style.display = on ? "" : "none"; } }
 
-  function fillCarreras(fac) {
-    var selC = document.getElementById("filterCarrera");
-    if (!selC || !BASE_RECORDS) return;
-    var vals = BASE_RECORDS.filter(function (r) { return r.carrera && (!fac || r.facultad === fac); })
-      .map(function (r) { return r.carrera; });
-    selC.innerHTML = '<option value="">Todas las carreras</option>';
-    filtroUnicos(vals).forEach(function (c) {
-      var o = document.createElement("option"); o.value = c; o.textContent = c; selC.appendChild(o);
+  function fillSelect(id, values, placeholder) {
+    var sel = document.getElementById(id);
+    if (!sel) return;
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">' + placeholder + '</option>';
+    values.forEach(function (v) {
+      var o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o);
     });
+    sel.value = (cur && values.indexOf(cur) !== -1) ? cur : "";
+  }
+
+  // Cascada: Campus acota Facultad, y Campus+Facultad acotan Programa. Conserva la selección si sigue válida.
+  function refillOptions() {
+    if (!BASE_RECORDS) return;
+    fillSelect("filterCampus", filtroUnicos(BASE_RECORDS.map(function (r) { return r.campus; })), "Todos los campus");
+    var cam = valOf("filterCampus");
+    var facBase = BASE_RECORDS.filter(function (r) { return !cam || r.campus === cam; });
+    fillSelect("filterFacultad", filtroUnicos(facBase.map(function (r) { return r.facultad; })), "Todas las facultades");
+    var fac = valOf("filterFacultad");
+    var carBase = facBase.filter(function (r) { return !fac || r.facultad === fac; });
+    fillSelect("filterCarrera", filtroUnicos(carBase.map(function (r) { return r.carrera; })), "Todos los programas");
   }
 
   function setupFilters(records) {
     var bar = document.getElementById("filterBar");
-    var selF = document.getElementById("filterFacultad");
-    var selC = document.getElementById("filterCarrera");
-    if (!bar || !selF || !selC) return;
+    if (!bar) return;
+    var hasCampus = records.some(function (r) { return r.campus; });
     var hasFac = records.some(function (r) { return r.facultad; });
     var hasCar = records.some(function (r) { return r.carrera; });
-    if (!hasFac && !hasCar) { bar.hidden = true; return; }
+    if (!hasCampus && !hasFac && !hasCar) { bar.hidden = true; return; }
     bar.hidden = false;
-    selF.innerHTML = '<option value="">Todas las facultades</option>';
-    filtroUnicos(records.map(function (r) { return r.facultad; })).forEach(function (f) {
-      var o = document.createElement("option"); o.value = f; o.textContent = f; selF.appendChild(o);
-    });
-    var fF = selF.closest(".filter-field"); if (fF) fF.style.display = hasFac ? "" : "none";
-    var fC = selC.closest(".filter-field"); if (fC) fC.style.display = hasCar ? "" : "none";
-    selF.value = ""; selC.value = "";
-    fillCarreras("");
+    show("filterCampus", hasCampus); show("filterFacultad", hasFac); show("filterCarrera", hasCar);
+    ["filterCampus", "filterFacultad", "filterCarrera"].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ""; });
+    refillOptions();
     updateFilterCount();
   }
 
   function filteredRecords() {
     if (!BASE_RECORDS) return null;
-    var f = document.getElementById("filterFacultad").value;
-    var c = document.getElementById("filterCarrera").value;
-    if (!f && !c) return BASE_RECORDS;
+    var cam = valOf("filterCampus"), fac = valOf("filterFacultad"), car = valOf("filterCarrera");
+    if (!cam && !fac && !car) return BASE_RECORDS;
     return BASE_RECORDS.filter(function (r) {
-      if (f && r.facultad !== f) return false;
-      if (c && r.carrera !== c) return false;
+      if (cam && r.campus !== cam) return false;
+      if (fac && r.facultad !== fac) return false;
+      if (car && r.carrera !== car) return false;
       return true;
     });
   }
@@ -3836,12 +3855,15 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
     var resetBtn = document.getElementById("resetBtn");
     var sourcePill = document.getElementById("sourcePill");
     (function () {
-      var selF = document.getElementById("filterFacultad");
-      var selC = document.getElementById("filterCarrera");
-      if (selF) selF.addEventListener("change", function () { fillCarreras(selF.value); selC.value = ""; applyFilters(); });
-      if (selC) selC.addEventListener("change", function () { applyFilters(); });
+      function onParent() { refillOptions(); applyFilters(); }
+      var cam = document.getElementById("filterCampus"); if (cam) cam.addEventListener("change", onParent);
+      var fac = document.getElementById("filterFacultad"); if (fac) fac.addEventListener("change", onParent);
+      var car = document.getElementById("filterCarrera"); if (car) car.addEventListener("change", applyFilters);
       var fc = document.getElementById("filterClear");
-      if (fc) fc.addEventListener("click", function () { selF.value = ""; selC.value = ""; fillCarreras(""); applyFilters(); });
+      if (fc) fc.addEventListener("click", function () {
+        ["filterCampus", "filterFacultad", "filterCarrera"].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ""; });
+        refillOptions(); applyFilters();
+      });
     })();
     var pdfBtn = document.getElementById("downloadPdfBtn");
     if (pdfBtn) pdfBtn.addEventListener("click", function () { window.print(); });
@@ -3937,7 +3959,8 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
           estado: detectEstadoColumn(parsed.rows, used),
           ciudad: detectCiudadColumn(parsed.rows, used),
           facultad: detectFacultadColumn(parsed.rows, used),
-          carrera: detectCarreraColumn(parsed.rows, used)
+          carrera: detectCarreraColumn(parsed.rows, used),
+          campus: detectCampusColumn(parsed.rows, used)
         };
         var extracted = extractRecords(dataRows, cols);
         if (extracted.list.length === 0) {
@@ -3955,7 +3978,8 @@ L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._lat
           (cols.becaClave >= 0 ? " · columna de beca detectada" : " · sin columna de beca") +
           (cols.creditos >= 0 ? " · columna de créditos detectada" : " · sin columna de créditos") +
           (cols.facultad >= 0 ? " · columna de facultad detectada" : "") +
-          (cols.carrera >= 0 ? " · columna de carrera detectada" : "") +
+          (cols.carrera >= 0 ? " · columna de programa detectada" : "") +
+          (cols.campus >= 0 ? " · columna de campus detectada" : "") +
           (decoded.encoding === "Windows-1252" ? " · texto leído como Windows-1252 (detectado automáticamente)" : "") +
           (decoded.encoding === "Excel" ? " · leído desde Excel (primera hoja)" : "") + ".";
         sourcePill.textContent = file.name;
